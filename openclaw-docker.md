@@ -32,6 +32,8 @@
     sudo adduser openclaw
     # 添加到docker组
     sudo usermod -aG docker openclaw
+    # 立刻使组权限生效，否则需该用户下次登录才生效
+    newgrp docker
     ```
 
 2. openclaw容器访问宿主机ollama服务
@@ -56,7 +58,7 @@
     首先需要让网关在物理机的局域网内可以被访问
     ```
     # 进入openclaw容器的终端
-    docker exec <openclaw容器的ID> /bin/sh
+    docker exec -it <openclaw容器的ID> /bin/sh
     # 配置允许局域网IP访问网关控制台
     openclaw config set gateway.controlUi.allowedOrigins '["*"]' --json
     ```
@@ -148,6 +150,50 @@
 
     由于是docker容器部署，普通账号不方便直接修改~/.openclaw/openclaw.json文件。较为简单的方法是切换到一个有sudo权限的账号进行操作。
 
+
+9. 搜索引擎相关
+
+    目前部署的openclaw找不到duckduckgo，因此需要部署另一个免费的SearXNG。根据官网教程，需要先使用docker部署一个SearXNG服务容器，但直接部署的没有启用json api并且开启了防爬虫机制，因此需要手动输入配置文件修改容器的设置。
+    ```
+    # 1. 创建配置目录
+    mkdir -p $(pwd)/searxng-config
+
+    # 2. 手动创建一份核心的 settings.yml
+    cat <<EOF > $(pwd)/searxng-config/settings.yml
+    use_default_settings: true
+    server:
+    port: 8080
+    bind_address: "0.0.0.0"
+    secret_key: "openclaw-searxng-secret-$(date +%s)"
+    base_url: false
+    limiter: false
+
+    search:
+    safe_search: 0
+    autocomplete: ""
+    default_lang: ""
+    formats:
+        - html
+        - json
+    EOF
+
+    # 3. 停止你之前运行的有问题的 searxng（如果有）
+    docker rm -f searxng || true
+
+    # 4. 用挂载我们的精简配置启动容器
+    docker run -d \
+    --name searxng \
+    -p 18888:8080 \
+    -v $(pwd)/searxng-config:/etc/searxng \
+    searxng/searxng
+    ```
+
+    然后在openclaw的容器终端中配置搜索引擎服务
+    ```
+    openclaw configure --section web
+    
+    # url填入物理机局域网ip+SearXNG容器端口号即可
+    ```
 
 ## 设置聊天平台
 原生openclaw支持的平台中，中国内地较为方便的应用为QQ、飞书和Teams，考虑到方便性，优先使用QQ bot，依照[官方教程](https://docs.openclaw.ai/channels/qqbot)
