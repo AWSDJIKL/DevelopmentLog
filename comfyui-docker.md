@@ -133,7 +133,7 @@ docker run -d \
   -e CUDA_HOME="/usr/local/cuda-13.1" \
   -w /workspace/ComfyUI \
   comfyui-docker-v1 \
-  python main.py --listen 0.0.0.0
+  python main.py --enable-manager --listen 0.0.0.0
 
 # 查看后台运行日志
 docker logs -f comfyui 
